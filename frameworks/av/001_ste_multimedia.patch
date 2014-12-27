@@ -54,7 +54,7 @@ index 64b4c2a..630e46c 100644
  
      struct CodecNameAndQuirks {
 diff --git a/frameworks/av/media/libstagefright/ACodec.cpp b/frameworks/av/media/libstagefright/ACodec.cpp
-index acba802..6d5f2cd 100644
+index 229e704..c28a0ac 100644
 --- a/frameworks/av/media/libstagefright/ACodec.cpp
 +++ b/frameworks/av/media/libstagefright/ACodec.cpp
 @@ -666,8 +666,12 @@ status_t ACodec::configureOutputBuffersFromNativeWindow(
@@ -70,20 +70,18 @@ index acba802..6d5f2cd 100644
  
      if (err != 0) {
          ALOGE("native_window_set_buffers_geometry failed: %s (%d)",
-@@ -4486,7 +4490,11 @@ bool ACodec::BaseState::onOMXFillBufferDone(
+@@ -4486,7 +4490,9 @@ bool ACodec::BaseState::onOMXFillBufferDone(
                  mCodec->mSkipCutBuffer->submit(info->mData);
              }
              info->mData->meta()->setInt64("timeUs", timeUs);
-+#ifdef STE_HARDWARE
-+            info->mData->meta()->setObject("graphic-buffer", (android::RefBase*)&info->mGraphicBuffer);
-+#else
++#ifndef STE_HARDWARE
              info->mData->meta()->setObject("graphic-buffer", info->mGraphicBuffer);
 +#endif
  
              sp<AMessage> notify = mCodec->mNotify->dup();
              notify->setInt32("what", CodecBase::kWhatDrainThisBuffer);
 diff --git a/frameworks/av/media/libstagefright/CameraSource.cpp b/frameworks/av/media/libstagefright/CameraSource.cpp
-index 75999d6..93284e9 100644
+index b6f821c..f13bab4 100644
 --- a/frameworks/av/media/libstagefright/CameraSource.cpp
 +++ b/frameworks/av/media/libstagefright/CameraSource.cpp
 @@ -132,6 +132,12 @@ static int32_t getColorFormat(const char* colorFormat) {
@@ -251,7 +249,7 @@ index fe38f16..0940177 100644
  
      CHECK_GE(type, OMX_VIDEO_CodingVendorStartUnused);
 diff --git a/frameworks/av/media/libstagefright/SurfaceMediaSource.cpp b/frameworks/av/media/libstagefright/SurfaceMediaSource.cpp
-index b521b9e..4ac1f5c 100644
+index 84b87aa..f9b81e3 100644
 --- a/frameworks/av/media/libstagefright/SurfaceMediaSource.cpp
 +++ b/frameworks/av/media/libstagefright/SurfaceMediaSource.cpp
 @@ -62,7 +62,11 @@ SurfaceMediaSource::SurfaceMediaSource(uint32_t bufferWidth, uint32_t bufferHeig
