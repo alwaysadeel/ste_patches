@@ -174,7 +174,7 @@ index 100bb26..97cfc82 100644
  
      // addReleaseFence* adds the sync points associated with a fence to the set
 diff --git a/frameworks/native/include/gui/GLConsumer.h b/frameworks/native/include/gui/GLConsumer.h
-index e03de45..a3f756f 100644
+index e03de45..5e3db19 100644
 --- a/frameworks/native/include/gui/GLConsumer.h
 +++ b/frameworks/native/include/gui/GLConsumer.h
 @@ -30,6 +30,11 @@
@@ -223,7 +223,19 @@ index e03de45..a3f756f 100644
      static bool isExternalFormat(uint32_t format);
  
      // This releases the buffer in the slot referenced by mCurrentTexture,
-@@ -332,6 +350,11 @@ private:
+@@ -304,6 +322,11 @@ private:
+         const native_handle* graphicBufferHandle() {
+             return mGraphicBuffer == NULL ? NULL : mGraphicBuffer->handle;
+         }
++#ifdef STE_HARDWARE
++        void setGraphicBuffer(sp<GraphicBuffer> graphicBuffer) {
++            mGraphicBuffer = graphicBuffer;
++        }
++#endif
+ 
+     private:
+         // Only allow instantiation using ref counting.
+@@ -332,6 +355,11 @@ private:
          Rect mCropRect;
      };
  
@@ -235,7 +247,7 @@ index e03de45..a3f756f 100644
      // freeBufferLocked frees up the given buffer slot. If the slot has been
      // initialized this will release the reference to the GraphicBuffer in that
      // slot and destroy the EGLImage in that slot.  Otherwise it has no effect.
-@@ -475,6 +498,22 @@ private:
+@@ -475,6 +503,22 @@ private:
      // reset mCurrentTexture to INVALID_BUFFER_SLOT.
      int mCurrentTexture;
  
@@ -407,7 +419,7 @@ index 0d1c68c..0e83124 100644
  }; // namespace android
  
 diff --git a/frameworks/native/libs/binder/MemoryBase.cpp b/frameworks/native/libs/binder/MemoryBase.cpp
-index 1190ff6..64ee6c9 100644
+index 6604757..e6d6401 100644
 --- a/frameworks/native/libs/binder/MemoryBase.cpp
 +++ b/frameworks/native/libs/binder/MemoryBase.cpp
 @@ -25,6 +25,10 @@ namespace android {
@@ -476,10 +488,10 @@ index 1dbb06f..3338a65 100644
  {
      // size
 diff --git a/frameworks/native/libs/gui/Android.mk b/frameworks/native/libs/gui/Android.mk
-index 451eee7..49d8691 100644
+index b3a3c71..36af84c 100644
 --- a/frameworks/native/libs/gui/Android.mk
 +++ b/frameworks/native/libs/gui/Android.mk
-@@ -59,6 +59,12 @@ ifeq ($(BOARD_USE_MHEAP_SCREENSHOT),true)
+@@ -55,6 +55,12 @@ ifeq ($(BOARD_USE_MHEAP_SCREENSHOT),true)
      LOCAL_CFLAGS += -DUSE_MHEAP_SCREENSHOT
  endif
  
@@ -493,7 +505,7 @@ index 451eee7..49d8691 100644
  
  ifeq ($(TARGET_BOARD_PLATFORM), tegra)
 diff --git a/frameworks/native/libs/gui/GLConsumer.cpp b/frameworks/native/libs/gui/GLConsumer.cpp
-index b4d0c1f..0dc89dd 100644
+index b4d0c1f..0af508a 100644
 --- a/frameworks/native/libs/gui/GLConsumer.cpp
 +++ b/frameworks/native/libs/gui/GLConsumer.cpp
 @@ -133,6 +133,9 @@ GLConsumer::GLConsumer(const sp<IGraphicBufferConsumer>& bq, uint32_t tex,
@@ -570,7 +582,7 @@ index b4d0c1f..0dc89dd 100644
  status_t GLConsumer::updateAndReleaseLocked(const BufferQueue::BufferItem& item)
  {
      status_t err = NO_ERROR;
-@@ -387,6 +433,52 @@ status_t GLConsumer::updateAndReleaseLocked(const BufferQueue::BufferItem& item)
+@@ -387,12 +433,64 @@ status_t GLConsumer::updateAndReleaseLocked(const BufferQueue::BufferItem& item)
          return err;
      }
  
@@ -578,9 +590,6 @@ index b4d0c1f..0dc89dd 100644
 +    sp<GraphicBuffer> textureBuffer;
 +    if (mSlots[buf].mGraphicBuffer->getPixelFormat() == HAL_PIXEL_FORMAT_YCBCR42XMBN
 +     || mSlots[buf].mGraphicBuffer->getPixelFormat() == HAL_PIXEL_FORMAT_YCbCr_420_P) {
-+        /* deallocate image each time .... */
-+        mEglSlots[buf].mEglImage.clear();
-+
 +        /* test if source and convert buffer size are ok */
 +        if (mSlots[buf].mGraphicBuffer != NULL && mBlitSlots[mNextBlitSlot] != NULL) {
 +            sp<GraphicBuffer> srcBuf = mSlots[buf].mGraphicBuffer;
@@ -618,12 +627,27 @@ index b4d0c1f..0dc89dd 100644
 +    } else {
 +        textureBuffer = mSlots[buf].mGraphicBuffer;
 +    }
++
++    // Set EglImage to use the new textureBuffer
++    mEglSlots[buf].mEglImage->setGraphicBuffer(textureBuffer);
 +#endif
 +
      // Ensure we have a valid EglImageKHR for the slot, creating an EglImage
      // if nessessary, for the gralloc buffer currently in the slot in
      // ConsumerBase.
-@@ -408,7 +500,11 @@ status_t GLConsumer::updateAndReleaseLocked(const BufferQueue::BufferItem& item)
+     // We may have to do this even when item.mGraphicBuffer == NULL (which
+     // means the buffer was previously acquired).
++#ifdef STE_HARDWARE
++    // Force EglImage to destroy old eglImage and create a new one
++    // using textureBuffer.
++    err = mEglSlots[buf].mEglImage->createIfNeeded(mEglDisplay, item.mCrop, true);
++#else
+     err = mEglSlots[buf].mEglImage->createIfNeeded(mEglDisplay, item.mCrop);
++#endif
+     if (err != NO_ERROR) {
+         ST_LOGW("updateAndRelease: unable to createImage on display=%p slot=%d",
+                 mEglDisplay, buf);
+@@ -408,7 +506,11 @@ status_t GLConsumer::updateAndReleaseLocked(const BufferQueue::BufferItem& item)
          // release the old buffer, so instead we just drop the new frame.
          // As we are still under lock since acquireBuffer, it is safe to
          // release by slot.
@@ -635,7 +659,7 @@ index b4d0c1f..0dc89dd 100644
                  mEglDisplay, EGL_NO_SYNC_KHR);
          return err;
      }
-@@ -1045,6 +1141,49 @@ void GLConsumer::dumpLocked(String8& result, const char* prefix) const
+@@ -1045,6 +1147,49 @@ void GLConsumer::dumpLocked(String8& result, const char* prefix) const
      ConsumerBase::dumpLocked(result, prefix);
  }
  
@@ -866,7 +890,7 @@ index 3a26c38..44e7d52 100644
  
      EGLConfig       mConfig;
 diff --git a/frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp b/frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
-index bbe5e90..076c6f4 100644
+index 708e205..0ec751e 100644
 --- a/frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
 +++ b/frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
 @@ -3337,6 +3337,9 @@ class GraphicProducerWrapper : public BBinder, public MessageHandler {
