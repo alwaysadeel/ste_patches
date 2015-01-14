@@ -174,7 +174,7 @@ index 100bb26..97cfc82 100644
  
      // addReleaseFence* adds the sync points associated with a fence to the set
 diff --git a/frameworks/native/include/gui/GLConsumer.h b/frameworks/native/include/gui/GLConsumer.h
-index e03de45..5e3db19 100644
+index e03de45..d313ada 100644
 --- a/frameworks/native/include/gui/GLConsumer.h
 +++ b/frameworks/native/include/gui/GLConsumer.h
 @@ -30,6 +30,11 @@
@@ -189,17 +189,7 @@ index e03de45..5e3db19 100644
  namespace android {
  // ----------------------------------------------------------------------------
  
-@@ -54,6 +59,9 @@ class String8;
- class GLConsumer : public ConsumerBase {
- public:
-     enum { TEXTURE_EXTERNAL = 0x8D65 }; // GL_TEXTURE_EXTERNAL_OES
-+#ifdef STE_HARDWARE
-+    enum { NUM_BLIT_BUFFER_SLOTS = 2 };
-+#endif
-     typedef ConsumerBase::FrameAvailableListener FrameAvailableListener;
- 
-     // GLConsumer constructs a new GLConsumer object. If the constructor with
-@@ -89,6 +97,11 @@ public:
+@@ -89,6 +94,11 @@ public:
      GLConsumer(const sp<IGraphicBufferConsumer>& bq, uint32_t texureTarget,
              bool useFenceSync, bool isControlledByApp);
  
@@ -211,7 +201,7 @@ index e03de45..5e3db19 100644
      // updateTexImage acquires the most recently queued buffer, and sets the
      // image contents of the target texture to it.
      //
-@@ -259,6 +272,11 @@ protected:
+@@ -259,6 +269,11 @@ protected:
          return releaseBufferLocked(slot, graphicBuffer, mEglDisplay, eglFence);
      }
  
@@ -223,7 +213,7 @@ index e03de45..5e3db19 100644
      static bool isExternalFormat(uint32_t format);
  
      // This releases the buffer in the slot referenced by mCurrentTexture,
-@@ -304,6 +322,11 @@ private:
+@@ -304,6 +319,11 @@ private:
          const native_handle* graphicBufferHandle() {
              return mGraphicBuffer == NULL ? NULL : mGraphicBuffer->handle;
          }
@@ -235,7 +225,7 @@ index e03de45..5e3db19 100644
  
      private:
          // Only allow instantiation using ref counting.
-@@ -332,6 +355,11 @@ private:
+@@ -332,6 +352,11 @@ private:
          Rect mCropRect;
      };
  
@@ -247,7 +237,7 @@ index e03de45..5e3db19 100644
      // freeBufferLocked frees up the given buffer slot. If the slot has been
      // initialized this will release the reference to the GraphicBuffer in that
      // slot and destroy the EGLImage in that slot.  Otherwise it has no effect.
-@@ -475,6 +503,22 @@ private:
+@@ -475,6 +500,22 @@ private:
      // reset mCurrentTexture to INVALID_BUFFER_SLOT.
      int mCurrentTexture;
  
@@ -505,7 +495,7 @@ index b3a3c71..36af84c 100644
  
  ifeq ($(TARGET_BOARD_PLATFORM), tegra)
 diff --git a/frameworks/native/libs/gui/GLConsumer.cpp b/frameworks/native/libs/gui/GLConsumer.cpp
-index b4d0c1f..0af508a 100644
+index b4d0c1f..3bf29d2 100644
 --- a/frameworks/native/libs/gui/GLConsumer.cpp
 +++ b/frameworks/native/libs/gui/GLConsumer.cpp
 @@ -133,6 +133,9 @@ GLConsumer::GLConsumer(const sp<IGraphicBufferConsumer>& bq, uint32_t tex,
@@ -890,10 +880,10 @@ index 3a26c38..44e7d52 100644
  
      EGLConfig       mConfig;
 diff --git a/frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp b/frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
-index 708e205..0ec751e 100644
+index 3717ffd..82758bc 100644
 --- a/frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
 +++ b/frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
-@@ -3337,6 +3337,9 @@ class GraphicProducerWrapper : public BBinder, public MessageHandler {
+@@ -3348,6 +3348,9 @@ class GraphicProducerWrapper : public BBinder, public MessageHandler {
      uint32_t code;
      Parcel const* data;
      Parcel* reply;
@@ -903,7 +893,7 @@ index 708e205..0ec751e 100644
  
      enum {
          MSG_API_CALL,
-@@ -3350,6 +3353,9 @@ class GraphicProducerWrapper : public BBinder, public MessageHandler {
+@@ -3361,6 +3364,9 @@ class GraphicProducerWrapper : public BBinder, public MessageHandler {
       */
      virtual status_t transact(uint32_t code,
              const Parcel& data, Parcel* reply, uint32_t /* flags */) {
@@ -913,7 +903,7 @@ index 708e205..0ec751e 100644
          this->code = code;
          this->data = &data;
          this->reply = reply;
-@@ -3367,6 +3373,9 @@ class GraphicProducerWrapper : public BBinder, public MessageHandler {
+@@ -3378,6 +3384,9 @@ class GraphicProducerWrapper : public BBinder, public MessageHandler {
              looper->sendMessage(this, Message(MSG_API_CALL));
              barrier.wait();
          }
