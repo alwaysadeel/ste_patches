@@ -142,21 +142,6 @@ index ca2c35d..87f42f5 100644
      size_t getPodSize() const;
      size_t getFlattenedSize() const;
      size_t getFdCount() const;
-diff --git a/frameworks/native/include/gui/BufferQueue.h b/frameworks/native/include/gui/BufferQueue.h
-index 9688f93..61a0b76 100644
---- a/frameworks/native/include/gui/BufferQueue.h
-+++ b/frameworks/native/include/gui/BufferQueue.h
-@@ -41,6 +41,10 @@ public:
-         PRESENT_LATER = IGraphicBufferConsumer::PRESENT_LATER,
-     };
- 
-+#ifdef STE_HARDWARE
-+    enum { NUM_BLIT_BUFFER_SLOTS = 2 };
-+#endif
-+
-     // When in async mode we reserve two slots in order to guarantee that the
-     // producer and consumer can run asynchronously.
-     enum { MAX_MAX_ACQUIRED_BUFFERS = NUM_BUFFER_SLOTS - 2 };
 diff --git a/frameworks/native/include/gui/ConsumerBase.h b/frameworks/native/include/gui/ConsumerBase.h
 index 100bb26..97cfc82 100644
 --- a/frameworks/native/include/gui/ConsumerBase.h
@@ -174,7 +159,7 @@ index 100bb26..97cfc82 100644
  
      // addReleaseFence* adds the sync points associated with a fence to the set
 diff --git a/frameworks/native/include/gui/GLConsumer.h b/frameworks/native/include/gui/GLConsumer.h
-index e03de45..d313ada 100644
+index e03de45..615da01 100644
 --- a/frameworks/native/include/gui/GLConsumer.h
 +++ b/frameworks/native/include/gui/GLConsumer.h
 @@ -30,6 +30,11 @@
@@ -189,7 +174,17 @@ index e03de45..d313ada 100644
  namespace android {
  // ----------------------------------------------------------------------------
  
-@@ -89,6 +94,11 @@ public:
+@@ -54,6 +59,9 @@ class String8;
+ class GLConsumer : public ConsumerBase {
+ public:
+     enum { TEXTURE_EXTERNAL = 0x8D65 }; // GL_TEXTURE_EXTERNAL_OES
++#ifdef STE_HARDWARE
++    enum { NUM_BLIT_BUFFER_SLOTS = 2 };
++#endif
+     typedef ConsumerBase::FrameAvailableListener FrameAvailableListener;
+ 
+     // GLConsumer constructs a new GLConsumer object. If the constructor with
+@@ -89,6 +97,11 @@ public:
      GLConsumer(const sp<IGraphicBufferConsumer>& bq, uint32_t texureTarget,
              bool useFenceSync, bool isControlledByApp);
  
@@ -201,7 +196,7 @@ index e03de45..d313ada 100644
      // updateTexImage acquires the most recently queued buffer, and sets the
      // image contents of the target texture to it.
      //
-@@ -259,6 +269,11 @@ protected:
+@@ -259,6 +272,11 @@ protected:
          return releaseBufferLocked(slot, graphicBuffer, mEglDisplay, eglFence);
      }
  
@@ -213,7 +208,7 @@ index e03de45..d313ada 100644
      static bool isExternalFormat(uint32_t format);
  
      // This releases the buffer in the slot referenced by mCurrentTexture,
-@@ -304,6 +319,11 @@ private:
+@@ -304,6 +322,11 @@ private:
          const native_handle* graphicBufferHandle() {
              return mGraphicBuffer == NULL ? NULL : mGraphicBuffer->handle;
          }
@@ -225,11 +220,14 @@ index e03de45..d313ada 100644
  
      private:
          // Only allow instantiation using ref counting.
-@@ -332,6 +352,11 @@ private:
+@@ -332,6 +355,14 @@ private:
          Rect mCropRect;
      };
  
 +#ifdef STE_HARDWARE
++    // returns TRUE if buffer needs color format conversion
++    bool conversionIsNeeded(const sp<GraphicBuffer>& graphicBuffer);
++
 +    // converts buffer to a suitable color format
 +    status_t convert(sp<GraphicBuffer> &srcBuf, sp<GraphicBuffer> &dstBuf);
 +#endif
@@ -237,7 +235,7 @@ index e03de45..d313ada 100644
      // freeBufferLocked frees up the given buffer slot. If the slot has been
      // initialized this will release the reference to the GraphicBuffer in that
      // slot and destroy the EGLImage in that slot.  Otherwise it has no effect.
-@@ -475,6 +500,22 @@ private:
+@@ -475,6 +506,22 @@ private:
      // reset mCurrentTexture to INVALID_BUFFER_SLOT.
      int mCurrentTexture;
  
@@ -253,7 +251,7 @@ index e03de45..d313ada 100644
 +    // mBlitSlots stores the buffers that have been allocated int the case
 +    // of color transform. It is initialised to null pointer,s and gets
 +    // filled in with the result of GLConsumer::updateAndReleaseLocked
-+    sp<GraphicBuffer> mBlitSlots[BufferQueue::NUM_BLIT_BUFFER_SLOTS];
++    sp<GraphicBuffer> mBlitSlots[NUM_BLIT_BUFFER_SLOTS];
 +    int mNextBlitSlot;
 +#endif
 +
@@ -478,7 +476,7 @@ index 1dbb06f..3338a65 100644
  {
      // size
 diff --git a/frameworks/native/libs/gui/Android.mk b/frameworks/native/libs/gui/Android.mk
-index b3a3c71..36af84c 100644
+index f9eff1c..b51d9ff 100644
 --- a/frameworks/native/libs/gui/Android.mk
 +++ b/frameworks/native/libs/gui/Android.mk
 @@ -55,6 +55,12 @@ ifeq ($(BOARD_USE_MHEAP_SCREENSHOT),true)
@@ -495,7 +493,7 @@ index b3a3c71..36af84c 100644
  
  ifeq ($(TARGET_BOARD_PLATFORM), tegra)
 diff --git a/frameworks/native/libs/gui/GLConsumer.cpp b/frameworks/native/libs/gui/GLConsumer.cpp
-index b4d0c1f..3bf29d2 100644
+index b4d0c1f..1f81c2f 100644
 --- a/frameworks/native/libs/gui/GLConsumer.cpp
 +++ b/frameworks/native/libs/gui/GLConsumer.cpp
 @@ -133,6 +133,9 @@ GLConsumer::GLConsumer(const sp<IGraphicBufferConsumer>& bq, uint32_t tex,
@@ -547,7 +545,7 @@ index b4d0c1f..3bf29d2 100644
  
  status_t GLConsumer::setDefaultBufferSize(uint32_t w, uint32_t h)
  {
-@@ -365,6 +393,24 @@ status_t GLConsumer::releaseBufferLocked(int buf,
+@@ -365,6 +393,25 @@ status_t GLConsumer::releaseBufferLocked(int buf,
      return err;
  }
  
@@ -563,7 +561,8 @@ index b4d0c1f..3bf29d2 100644
 +    //
 +    // While going to work this should fix random reboots,
 +    // because stillTracking method will operate as it should.
-+    return ((mSlots[slot].mGraphicBuffer != NULL && mSlots[slot].mGraphicBuffer->handle == graphicBuffer->handle) ||
++    return ((mSlots[slot].mGraphicBuffer != NULL &&
++             mSlots[slot].mGraphicBuffer->handle == graphicBuffer->handle) ||
 +            (mBlitSlots[0] != NULL && mBlitSlots[0]->handle == graphicBuffer->handle) ||
 +            (mBlitSlots[1] != NULL && mBlitSlots[1]->handle == graphicBuffer->handle));
 +}
@@ -572,14 +571,13 @@ index b4d0c1f..3bf29d2 100644
  status_t GLConsumer::updateAndReleaseLocked(const BufferQueue::BufferItem& item)
  {
      status_t err = NO_ERROR;
-@@ -387,12 +433,64 @@ status_t GLConsumer::updateAndReleaseLocked(const BufferQueue::BufferItem& item)
+@@ -387,6 +434,51 @@ status_t GLConsumer::updateAndReleaseLocked(const BufferQueue::BufferItem& item)
          return err;
      }
  
 +#ifdef STE_HARDWARE
 +    sp<GraphicBuffer> textureBuffer;
-+    if (mSlots[buf].mGraphicBuffer->getPixelFormat() == HAL_PIXEL_FORMAT_YCBCR42XMBN
-+     || mSlots[buf].mGraphicBuffer->getPixelFormat() == HAL_PIXEL_FORMAT_YCbCr_420_P) {
++    if (conversionIsNeeded(mSlots[buf].mGraphicBuffer)) {
 +        /* test if source and convert buffer size are ok */
 +        if (mSlots[buf].mGraphicBuffer != NULL && mBlitSlots[mNextBlitSlot] != NULL) {
 +            sp<GraphicBuffer> srcBuf = mSlots[buf].mGraphicBuffer;
@@ -613,31 +611,19 @@ index b4d0c1f..3bf29d2 100644
 +            return UNKNOWN_ERROR;
 +        }
 +        textureBuffer = mBlitSlots[mNextBlitSlot];
-+        mNextBlitSlot = (mNextBlitSlot + 1) % BufferQueue::NUM_BLIT_BUFFER_SLOTS;
++        mNextBlitSlot = (mNextBlitSlot + 1) % NUM_BLIT_BUFFER_SLOTS;
++
++        // Set EglImage to use the new textureBuffer
++        mEglSlots[buf].mEglImage->setGraphicBuffer(textureBuffer);
 +    } else {
 +        textureBuffer = mSlots[buf].mGraphicBuffer;
 +    }
-+
-+    // Set EglImage to use the new textureBuffer
-+    mEglSlots[buf].mEglImage->setGraphicBuffer(textureBuffer);
 +#endif
 +
      // Ensure we have a valid EglImageKHR for the slot, creating an EglImage
      // if nessessary, for the gralloc buffer currently in the slot in
      // ConsumerBase.
-     // We may have to do this even when item.mGraphicBuffer == NULL (which
-     // means the buffer was previously acquired).
-+#ifdef STE_HARDWARE
-+    // Force EglImage to destroy old eglImage and create a new one
-+    // using textureBuffer.
-+    err = mEglSlots[buf].mEglImage->createIfNeeded(mEglDisplay, item.mCrop, true);
-+#else
-     err = mEglSlots[buf].mEglImage->createIfNeeded(mEglDisplay, item.mCrop);
-+#endif
-     if (err != NO_ERROR) {
-         ST_LOGW("updateAndRelease: unable to createImage on display=%p slot=%d",
-                 mEglDisplay, buf);
-@@ -408,7 +506,11 @@ status_t GLConsumer::updateAndReleaseLocked(const BufferQueue::BufferItem& item)
+@@ -408,7 +500,11 @@ status_t GLConsumer::updateAndReleaseLocked(const BufferQueue::BufferItem& item)
          // release the old buffer, so instead we just drop the new frame.
          // As we are still under lock since acquireBuffer, it is safe to
          // release by slot.
@@ -649,11 +635,16 @@ index b4d0c1f..3bf29d2 100644
                  mEglDisplay, EGL_NO_SYNC_KHR);
          return err;
      }
-@@ -1045,6 +1147,49 @@ void GLConsumer::dumpLocked(String8& result, const char* prefix) const
+@@ -1045,6 +1141,54 @@ void GLConsumer::dumpLocked(String8& result, const char* prefix) const
      ConsumerBase::dumpLocked(result, prefix);
  }
  
 +#ifdef STE_HARDWARE
++bool GLConsumer::conversionIsNeeded(const sp<GraphicBuffer>& graphicBuffer) {
++    int fmt = graphicBuffer->getPixelFormat();
++    return (fmt == PIXEL_FORMAT_YCBCR42XMBN) || (fmt == PIXEL_FORMAT_YCbCr_420_P);
++}
++
 +status_t GLConsumer::convert(sp<GraphicBuffer> &srcBuf, sp<GraphicBuffer> &dstBuf) {
 +    copybit_image_t dstImg;
 +    dstImg.w = dstBuf->getWidth();
@@ -880,10 +871,10 @@ index 3a26c38..44e7d52 100644
  
      EGLConfig       mConfig;
 diff --git a/frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp b/frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
-index 3717ffd..82758bc 100644
+index 2c6c77f..e6d4fc8 100644
 --- a/frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
 +++ b/frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
-@@ -3348,6 +3348,9 @@ class GraphicProducerWrapper : public BBinder, public MessageHandler {
+@@ -3361,6 +3361,9 @@ class GraphicProducerWrapper : public BBinder, public MessageHandler {
      uint32_t code;
      Parcel const* data;
      Parcel* reply;
@@ -893,7 +884,7 @@ index 3717ffd..82758bc 100644
  
      enum {
          MSG_API_CALL,
-@@ -3361,6 +3364,9 @@ class GraphicProducerWrapper : public BBinder, public MessageHandler {
+@@ -3374,6 +3377,9 @@ class GraphicProducerWrapper : public BBinder, public MessageHandler {
       */
      virtual status_t transact(uint32_t code,
              const Parcel& data, Parcel* reply, uint32_t /* flags */) {
@@ -903,7 +894,7 @@ index 3717ffd..82758bc 100644
          this->code = code;
          this->data = &data;
          this->reply = reply;
-@@ -3378,6 +3384,9 @@ class GraphicProducerWrapper : public BBinder, public MessageHandler {
+@@ -3391,6 +3397,9 @@ class GraphicProducerWrapper : public BBinder, public MessageHandler {
              looper->sendMessage(this, Message(MSG_API_CALL));
              barrier.wait();
          }
