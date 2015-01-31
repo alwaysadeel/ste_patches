@@ -691,36 +691,36 @@ index b4d0c1f..1f81c2f 100644
      out[0] = a[0]*b[0] + a[4]*b[1] + a[8]*b[2] + a[12]*b[3];
      out[1] = a[1]*b[0] + a[5]*b[1] + a[9]*b[2] + a[13]*b[3];
 diff --git a/frameworks/native/libs/ui/PixelFormat.cpp b/frameworks/native/libs/ui/PixelFormat.cpp
-index a716949..415b5aa 100644
+index a716949..b354aad 100644
 --- a/frameworks/native/libs/ui/PixelFormat.cpp
 +++ b/frameworks/native/libs/ui/PixelFormat.cpp
-@@ -88,10 +88,26 @@ status_t getPixelFormatInfo(PixelFormat format, PixelFormatInfo* info)
-     switch (format) {
-     case HAL_PIXEL_FORMAT_YCbCr_422_SP:
-     case HAL_PIXEL_FORMAT_YCbCr_422_I:
+@@ -142,6 +142,13 @@ ssize_t bytesPerPixel(PixelFormat format) {
+         case PIXEL_FORMAT_RGBA_5551:
+         case PIXEL_FORMAT_RGBA_4444:
+             return 2;
 +#ifdef STE_HARDWARE
-+    case HAL_PIXEL_FORMAT_YCrCb_422_SP:
-+    case HAL_PIXEL_FORMAT_YCbCr_422_P:
-+    case HAL_PIXEL_FORMAT_YCrCb_422_P:
-+    case HAL_PIXEL_FORMAT_CbYCrY_422_I:
++        case PIXEL_FORMAT_YCbCr_420_SP:
++        case PIXEL_FORMAT_YCbCr_420_P:
++        case PIXEL_FORMAT_YCBCR42XMBN:
++            return 1;
 +#endif
-         info->bitsPerPixel = 16;
-         goto done;
-     case HAL_PIXEL_FORMAT_YCrCb_420_SP:
-     case HAL_PIXEL_FORMAT_YV12:
++
+     }
+     return BAD_VALUE;
+ }
+@@ -158,6 +165,12 @@ ssize_t bitsPerPixel(PixelFormat format) {
+         case PIXEL_FORMAT_RGBA_5551:
+         case PIXEL_FORMAT_RGBA_4444:
+             return 16;
 +#ifdef STE_HARDWARE
-+    case HAL_PIXEL_FORMAT_YCbCr_420_SP:
-+    case HAL_PIXEL_FORMAT_YCbCr_420_SP_TILED:
-+    case HAL_PIXEL_FORMAT_YCrCb_420_SP_TILED:
-+    case HAL_PIXEL_FORMAT_YCbCr_420_P:
-+    case HAL_PIXEL_FORMAT_YCrCb_420_P:
-+    case HAL_PIXEL_FORMAT_YCbCr_420_I:
-+    case HAL_PIXEL_FORMAT_CbYCrY_420_I:
-+    case HAL_PIXEL_FORMAT_YCBCR42XMBN:
++        case PIXEL_FORMAT_YCbCr_420_SP:
++        case PIXEL_FORMAT_YCbCr_420_P:
++        case PIXEL_FORMAT_YCBCR42XMBN:
++            return 12;
 +#endif
-         info->bitsPerPixel = 12;
-      done:
-         info->format = format;
+     }
+     return BAD_VALUE;
+ }
 diff --git a/frameworks/native/opengl/include/EGL/eglext.h b/frameworks/native/opengl/include/EGL/eglext.h
 index 3b2984a..9736c5a 100644
 --- a/frameworks/native/opengl/include/EGL/eglext.h
