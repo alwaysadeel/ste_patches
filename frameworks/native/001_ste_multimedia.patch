@@ -795,7 +795,7 @@ index aa92ea0..52af354 100644
 \ No newline at end of file
 +EGL_ENTRY(EGLBoolean, eglAwakenProcessIMG, void)
 diff --git a/frameworks/native/services/surfaceflinger/DisplayDevice.cpp b/frameworks/native/services/surfaceflinger/DisplayDevice.cpp
-index 76ab552..3b19ee0 100644
+index 76ab552..c9d5580 100644
 --- a/frameworks/native/services/surfaceflinger/DisplayDevice.cpp
 +++ b/frameworks/native/services/surfaceflinger/DisplayDevice.cpp
 @@ -27,6 +27,10 @@
@@ -809,72 +809,23 @@ index 76ab552..3b19ee0 100644
  #include <gui/Surface.h>
  
  #include <hardware/gralloc.h>
-@@ -77,8 +81,12 @@ DisplayDevice::DisplayDevice(
+@@ -77,7 +81,11 @@ DisplayDevice::DisplayDevice(
        mPowerMode(HWC_POWER_MODE_OFF),
        mActiveConfig(0)
  {
 +#ifdef STE_HARDWARE
-+    ANativeWindow* const window = new FramebufferNativeWindow();
++    mNativeWindow = new FramebufferNativeWindow();
 +#else
      mNativeWindow = new Surface(producer, false);
-     ANativeWindow* const window = mNativeWindow.get();
 +#endif
+     ANativeWindow* const window = mNativeWindow.get();
  
      /*
-      * Create our display's surface
-@@ -450,7 +458,11 @@ void DisplayDevice::setDisplaySize(const int newWidth, const int newHeight) {
- 
-     mDisplaySurface->resizeBuffers(newWidth, newHeight);
- 
-+#ifdef STE_HARDWARE
-+    ANativeWindow* const window = new FramebufferNativeWindow();
-+#else
-     ANativeWindow* const window = mNativeWindow.get();
-+#endif
-     mSurface = eglCreateWindowSurface(mDisplay, mConfig, window, NULL);
-     eglQuerySurface(mDisplay, mSurface, EGL_WIDTH,  &mDisplayWidth);
-     eglQuerySurface(mDisplay, mSurface, EGL_HEIGHT, &mDisplayHeight);
-@@ -542,12 +554,19 @@ void DisplayDevice::dump(String8& result) const {
-     const Transform& tr(mGlobalTransform);
-     result.appendFormat(
-         "+ DisplayDevice: %s\n"
--        "   type=%x, hwcId=%d, layerStack=%u, (%4dx%4d), ANativeWindow=%p, orient=%2d (type=%08x), "
-+        "   type=%x, hwcId=%d, layerStack=%u, (%4dx%4d), "
-+#ifndef STE_HARDWARE
-+        "ANativeWindow=%p, "
-+#endif
-+        "orient=%2d (type=%08x), "
-         "flips=%u, isSecure=%d, secureVis=%d, powerMode=%d, activeConfig=%d, numLayers=%zu\n"
-         "   v:[%d,%d,%d,%d], f:[%d,%d,%d,%d], s:[%d,%d,%d,%d],"
-         "transform:[[%0.3f,%0.3f,%0.3f][%0.3f,%0.3f,%0.3f][%0.3f,%0.3f,%0.3f]]\n",
-         mDisplayName.string(), mType, mHwcDisplayId,
--        mLayerStack, mDisplayWidth, mDisplayHeight, mNativeWindow.get(),
-+        mLayerStack, mDisplayWidth, mDisplayHeight,
-+#ifndef STE_HARDWARE
-+        mNativeWindow.get(),
-+#endif
-         mOrientation, tr.getType(), getPageFlipCount(),
-         mIsSecure, mSecureLayerVisible, mPowerMode, mActiveConfig,
-         mVisibleLayersSortedByZ.size(),
-diff --git a/frameworks/native/services/surfaceflinger/DisplayDevice.h b/frameworks/native/services/surfaceflinger/DisplayDevice.h
-index 3a26c38..44e7d52 100644
---- a/frameworks/native/services/surfaceflinger/DisplayDevice.h
-+++ b/frameworks/native/services/surfaceflinger/DisplayDevice.h
-@@ -192,7 +192,9 @@ private:
-     wp<IBinder> mDisplayToken;
- 
-     // ANativeWindow this display is rendering into
-+#ifndef STE_HARDWARE
-     sp<ANativeWindow> mNativeWindow;
-+#endif
-     sp<DisplaySurface> mDisplaySurface;
- 
-     EGLConfig       mConfig;
 diff --git a/frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp b/frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
-index 2c6c77f..e6d4fc8 100644
+index 3997d77..48125be 100644
 --- a/frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
 +++ b/frameworks/native/services/surfaceflinger/SurfaceFlinger.cpp
-@@ -3361,6 +3361,9 @@ class GraphicProducerWrapper : public BBinder, public MessageHandler {
+@@ -3427,6 +3427,9 @@ class GraphicProducerWrapper : public BBinder, public MessageHandler {
      uint32_t code;
      Parcel const* data;
      Parcel* reply;
@@ -884,7 +835,7 @@ index 2c6c77f..e6d4fc8 100644
  
      enum {
          MSG_API_CALL,
-@@ -3374,6 +3377,9 @@ class GraphicProducerWrapper : public BBinder, public MessageHandler {
+@@ -3440,6 +3443,9 @@ class GraphicProducerWrapper : public BBinder, public MessageHandler {
       */
      virtual status_t transact(uint32_t code,
              const Parcel& data, Parcel* reply, uint32_t /* flags */) {
@@ -894,7 +845,7 @@ index 2c6c77f..e6d4fc8 100644
          this->code = code;
          this->data = &data;
          this->reply = reply;
-@@ -3391,6 +3397,9 @@ class GraphicProducerWrapper : public BBinder, public MessageHandler {
+@@ -3457,6 +3463,9 @@ class GraphicProducerWrapper : public BBinder, public MessageHandler {
              looper->sendMessage(this, Message(MSG_API_CALL));
              barrier.wait();
          }

@@ -11,7 +11,7 @@ index 102c3f1..6b97545 100644
      dalvik.vm.heapminfree=512k \
      dalvik.vm.heapmaxfree=2m
 diff --git a/frameworks/native/include/gui/SurfaceComposerClient.h b/frameworks/native/include/gui/SurfaceComposerClient.h
-index 0d19f07..994e3d2 100644
+index 7aa1c54..30cd2e2 100644
 --- a/frameworks/native/include/gui/SurfaceComposerClient.h
 +++ b/frameworks/native/include/gui/SurfaceComposerClient.h
 @@ -88,6 +88,17 @@ public:
@@ -33,10 +33,10 @@ index 0d19f07..994e3d2 100644
      // surface creation / destruction
  
 diff --git a/frameworks/native/libs/gui/SurfaceComposerClient.cpp b/frameworks/native/libs/gui/SurfaceComposerClient.cpp
-index 6ec4f23..4421d8c 100644
+index 59787bf..38561b5 100644
 --- a/frameworks/native/libs/gui/SurfaceComposerClient.cpp
 +++ b/frameworks/native/libs/gui/SurfaceComposerClient.cpp
-@@ -486,6 +486,30 @@ void SurfaceComposerClient::dispose() {
+@@ -538,6 +538,30 @@ void SurfaceComposerClient::dispose() {
      mStatus = NO_INIT;
  }
  
@@ -67,7 +67,7 @@ index 6ec4f23..4421d8c 100644
  sp<SurfaceControl> SurfaceComposerClient::createSurface(
          const String8& name,
          uint32_t w,
-@@ -685,6 +709,35 @@ status_t SurfaceComposerClient::getAnimationFrameStats(FrameStats* outStats) {
+@@ -753,6 +777,35 @@ status_t SurfaceComposerClient::getAnimationFrameStats(FrameStats* outStats) {
      return ComposerService::getComposerService()->getAnimationFrameStats(outStats);
  }
  
