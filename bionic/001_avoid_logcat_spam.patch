@@ -1,3 +1,16 @@
+From a0095b0dc82bcc8d3d7002af94603de951632ff8 Mon Sep 17 00:00:00 2001
+From: Marcin Chojnacki <marcinch7@gmail.com>
+Date: Sun, 10 Nov 2013 13:59:47 +0100
+Subject: [PATCH 1/1] linker: Avoid logcat spam with some blobs
+
+Many of pre-kitkat blobs would emit a "text relocations" warning which makes logcat completely unreadable.
+This commit will hide this warning to prevent it.
+
+Change-Id: I8f32b5bbfea33d732320b3ac29da6b0027fbd521
+---
+ linker/linker.cpp | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
 diff --git a/bionic/linker/linker.cpp b/bionic/linker/linker.cpp
 index cf65705..b7c8955 100644
 --- a/bionic/linker/linker.cpp
@@ -11,3 +24,6 @@ index cf65705..b7c8955 100644
                  "security hardening. Please fix.", si->name);
          if (phdr_table_unprotect_segments(si->phdr, si->phnum, si->load_bias) < 0) {
              DL_ERR("can't unprotect loadable segments for \"%s\": %s",
+-- 
+1.9.1
+
